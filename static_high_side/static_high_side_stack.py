@@ -1,7 +1,6 @@
 from aws_cdk import (
     Stack,
     RemovalPolicy,
-    Stack,
     aws_apigateway as apigateway,
     aws_certificatemanager as acm,
     aws_iam as iam,
@@ -72,6 +71,18 @@ class StaticHighSideStack(Stack):
             endpoint_types=[apigateway.EndpointType.REGIONAL],
             policy=api_policy_doc,
         )
+
+        velvet_rope = iam.PolicyStatement(
+            effect=iam.Effect.DENY,
+            actions=["s3:List*"],
+            resources=[bucket.bucket_arn, bucket.arn_for_objects("*")],
+            principals=[iam.AnyPrincipal()],
+            conditions={
+                "StringNotLike": {"aws:userId": [api_role.role_id, self.account]}
+            },
+        )
+        bucket.add_to_resource_policy(velvet_rope)
+
         # if config["hostedZoneId"]:
         hosted_zone = route53.HostedZone.from_hosted_zone_attributes(
             self,

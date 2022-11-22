@@ -1,0 +1,8 @@
+domainName: youralias.people.aws.dev
+subdomain: static                       # Any subdomain you want
+awsProfile: my-profile                  # AWS profile to use
+# used when evaluating whether to use acm for certificates, and locking down the api gateway to AWS internal cidr blocks
+awsInternal: false  # Whether using internal
+awsIpRanges:
+  - 1.1.1.1 # IPs you're okay with accessing your site
+hostedZoneId: Z0123456789ABCDEFGHIJ # Hosted zone id (https://docs.aws.amazon.com/cdk/api/latest/docs/@aws-cdk_aws-route53.HostedZone.html#static-fromwbrhostedwbrzonewbridscope-id-hostedzoneid)

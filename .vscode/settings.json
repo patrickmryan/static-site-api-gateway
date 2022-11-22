@@ -1,0 +1,7 @@
+{
+    "python.pythonPath": ".venv/bin/python",
+    "editor.rulers": [
+        79
+    ],
+    "python.formatting.provider": "black"
+}

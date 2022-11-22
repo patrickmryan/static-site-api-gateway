@@ -1,5 +1,5 @@
-from monocdk import (
-    Construct,
+from aws_cdk import (
+    Stack,
     RemovalPolicy,
     Stack,
     aws_apigateway as apigateway,
@@ -9,6 +9,7 @@ from monocdk import (
     aws_s3 as s3,
     aws_s3_deployment as s3_deployment,
 )
+from constructs import Construct
 
 from config import config
 
@@ -23,8 +24,8 @@ class StaticHighSideStack(Stack):
             "StaticAssetsBucket",
             encryption=s3.BucketEncryption.S3_MANAGED,
             removal_policy=RemovalPolicy.DESTROY
-            if config["awsInternal"]
-            else None,  # noqa: E501
+            # if config["awsInternal"]
+            # else None,  # noqa: E501
         )
         # Copy built react app to bucket
         s3_deployment.BucketDeployment(
@@ -32,7 +33,7 @@ class StaticHighSideStack(Stack):
             "UiCodeToBucket",
             sources=[s3_deployment.Source.asset("react-app/build")],
             destination_bucket=bucket,
-            retain_on_delete=False if config["awsInternal"] else True,
+            retain_on_delete=False,  # if config["awsInternal"] else True,
         )
         # IAM role granting apigateway read access to your S3 bucket
         api_role = iam.Role(
@@ -55,55 +56,53 @@ class StaticHighSideStack(Stack):
         )
         # When deploying in commercial accounts, we should lock down api access
         # to AWS internal network
-        if config["awsInternal"]:
-            api_policy_doc.add_statements(
-                iam.PolicyStatement(
-                    effect=iam.Effect.DENY,
-                    principals=[iam.AnyPrincipal()],
-                    actions=["execute-api:Invoke"],
-                    resources=["execute-api:/*/*/*"],
-                    conditions={
-                        "NotIpAddress": {"aws:SourceIp": config["awsIpRanges"]}
-                    },
-                )
+        # if config["awsInternal"]:
+        api_policy_doc.add_statements(
+            iam.PolicyStatement(
+                effect=iam.Effect.DENY,
+                principals=[iam.AnyPrincipal()],
+                actions=["execute-api:Invoke"],
+                resources=["execute-api:/*/*/*"],
+                conditions={"NotIpAddress": {"aws:SourceIp": config["awsIpRanges"]}},
             )
+        )
         api = apigateway.RestApi(
             self,
             "S3Api",
             endpoint_types=[apigateway.EndpointType.REGIONAL],
             policy=api_policy_doc,
         )
-        if config["hostedZoneId"]:
-            hosted_zone = route53.HostedZone.from_hosted_zone_attributes(
-                self,
-                "HostedZone",
-                hosted_zone_id=config["hostedZoneId"],
-                zone_name=config["domainName"],
-            )
-        if config["awsInternal"]:
-            api_certificate = acm.Certificate(
-                self,
-                "ApiCertificate",
-                domain_name=f"{config['subdomain']}.{config['domainName']}",
-                validation=acm.CertificateValidation.from_dns(
-                    hosted_zone=hosted_zone if config["hostedZoneId"] else None
-                ),
-            )
+        # if config["hostedZoneId"]:
+        hosted_zone = route53.HostedZone.from_hosted_zone_attributes(
+            self,
+            "HostedZone",
+            hosted_zone_id=config["hostedZoneId"],
+            zone_name=config["domainName"],
+        )
+        #        if config["awsInternal"]:
+        api_certificate = acm.Certificate(
+            self,
+            "ApiCertificate",
+            domain_name=f"{config['subdomain']}.{config['domainName']}",
+            validation=acm.CertificateValidation.from_dns(
+                hosted_zone=hosted_zone if config["hostedZoneId"] else None
+            ),
+        )
         # Need a domain name
         api_domain = api.add_domain_name(
             "ApiDomainName",
-            certificate=api_certificate if config["awsInternal"] else None,
+            certificate=api_certificate,  # if config["awsInternal"] else None,
             domain_name=f"{config['subdomain']}.{config['domainName']}",
             security_policy=apigateway.SecurityPolicy.TLS_1_2,
         )
-        if config["awsInternal"]:
-            route53.CnameRecord(
-                self,
-                "DnsCnameRecord",
-                domain_name=api_domain.domain_name_alias_domain_name,
-                zone=hosted_zone,
-                record_name=config["subdomain"],
-            )
+        # if config["awsInternal"]:
+        route53.CnameRecord(
+            self,
+            "DnsCnameRecord",
+            domain_name=api_domain.domain_name_alias_domain_name,
+            zone=hosted_zone,
+            record_name=config["subdomain"],
+        )
         # hardcode index.html for when url without path entered
         api.root.add_method(
             http_method="GET",

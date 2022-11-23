@@ -1,3 +1,5 @@
+import sys
+import boto3
 from aws_cdk import (
     Stack,
     RemovalPolicy,
@@ -16,6 +18,8 @@ from config import config
 class StaticHighSideStack(Stack):
     def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
         super().__init__(scope, construct_id, **kwargs)
+
+        sts = boto3.client("sts")
 
         # S3 bucket that will host the React application code
         bucket = s3.Bucket(
@@ -72,24 +76,14 @@ class StaticHighSideStack(Stack):
             policy=api_policy_doc,
         )
 
-        velvet_rope = iam.PolicyStatement(
-            effect=iam.Effect.DENY,
-            actions=["s3:List*"],
-            resources=[bucket.bucket_arn, bucket.arn_for_objects("*")],
-            principals=[iam.AnyPrincipal()],
-            conditions={
-                "StringNotLike": {
-                    "aws:userId": [api_role.role_id, self.account]
-                }  # noqa: E501
-            },
-        )
-        bucket.add_to_resource_policy(velvet_rope)
+        # print(str(api.root))
 
-        if config["hostedZoneId"]:
+        hosted_zone_id = config.get("hostedZoneId")
+        if hosted_zone_id:
             hosted_zone = route53.HostedZone.from_hosted_zone_attributes(
                 self,
                 "HostedZone",
-                hosted_zone_id=config["hostedZoneId"],
+                hosted_zone_id=hosted_zone_id,
                 zone_name=config["domainName"],
             )
 
@@ -116,7 +110,7 @@ class StaticHighSideStack(Stack):
             record_name=config["subdomain"],
         )
         # hardcode index.html for when url without path entered
-        api.root.add_method(
+        root_method = api.root.add_method(
             http_method="GET",
             integration=apigateway.AwsIntegration(
                 service="s3",
@@ -150,6 +144,8 @@ class StaticHighSideStack(Stack):
                 apigateway.MethodResponse(status_code="404"),
             ],
         )
+        # print(root_method.method_arn)
+
         path_resource = api.root.add_resource("{patha}")
         path_resource.add_method(
             http_method="GET",
@@ -235,3 +231,42 @@ class StaticHighSideStack(Stack):
                 apigateway.MethodResponse(status_code="404"),
             ],
         )
+
+        # arn:aws:execute-api:us-east-1:008690417405:h0c34d57j1/*/GET/
+        # arn:${Token[AWS.Partition.5]}:execute-api:us-east-1:008690417405:${Token[TOKEN.413]}/*
+
+        # method_arn = self.format_arn(
+        #     service='execute-api',
+        #     region=self.region,
+        #     account=self.account,
+        #     resource=api.rest_api_id+"/*")
+
+        # caller=sts.get_caller_identity()
+        # user_ids = [
+        #     api_role.role_id,   # the gateway
+        #     self.account,       # the account owner
+        #     caller['UserId']    # the identity synthesizing this stack
+        # ]
+
+        # trusted_arns = [
+        #     method_arn,
+        #     caller['Arn']
+        # ]
+
+        # velvet_rope = iam.PolicyStatement(
+        #     effect=iam.Effect.DENY,
+        #     actions=["s3:Get*", "s3:Put*", "s3:Delete*"], # , "s3:Update*", "s3:Create*",
+        #     resources=[bucket.bucket_arn, bucket.arn_for_objects("*")],
+        #     principals=[iam.AnyPrincipal()],
+        #     conditions={
+        #         "StringNotLike": {
+        #             "aws:userId": user_ids
+        #         },  # noqa: E501
+        #         "ArnNotLike":
+        #         {
+        #             "aws:SourceArn": trusted_arns
+        #         }
+        #     },
+
+        # )
+        # bucket.add_to_resource_policy(velvet_rope)

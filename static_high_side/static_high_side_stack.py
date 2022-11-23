@@ -22,9 +22,7 @@ class StaticHighSideStack(Stack):
             self,
             "StaticAssetsBucket",
             encryption=s3.BucketEncryption.S3_MANAGED,
-            removal_policy=RemovalPolicy.DESTROY
-            # if config["awsInternal"]
-            # else None,  # noqa: E501
+            removal_policy=RemovalPolicy.DESTROY,
         )
         # Copy built react app to bucket
         s3_deployment.BucketDeployment(
@@ -32,7 +30,7 @@ class StaticHighSideStack(Stack):
             "UiCodeToBucket",
             sources=[s3_deployment.Source.asset("react-app/build")],
             destination_bucket=bucket,
-            retain_on_delete=False,  # if config["awsInternal"] else True,
+            retain_on_delete=False,
         )
         # IAM role granting apigateway read access to your S3 bucket
         api_role = iam.Role(
@@ -55,14 +53,16 @@ class StaticHighSideStack(Stack):
         )
         # When deploying in commercial accounts, we should lock down api access
         # to AWS internal network
-        # if config["awsInternal"]:
+
         api_policy_doc.add_statements(
             iam.PolicyStatement(
                 effect=iam.Effect.DENY,
                 principals=[iam.AnyPrincipal()],
                 actions=["execute-api:Invoke"],
                 resources=["execute-api:/*/*/*"],
-                conditions={"NotIpAddress": {"aws:SourceIp": config["awsIpRanges"]}},
+                conditions={
+                    "NotIpAddress": {"aws:SourceIp": config["awsIpRanges"]}
+                },  # noqa: E501
             )
         )
         api = apigateway.RestApi(
@@ -78,19 +78,21 @@ class StaticHighSideStack(Stack):
             resources=[bucket.bucket_arn, bucket.arn_for_objects("*")],
             principals=[iam.AnyPrincipal()],
             conditions={
-                "StringNotLike": {"aws:userId": [api_role.role_id, self.account]}
+                "StringNotLike": {
+                    "aws:userId": [api_role.role_id, self.account]
+                }  # noqa: E501
             },
         )
         bucket.add_to_resource_policy(velvet_rope)
 
-        # if config["hostedZoneId"]:
-        hosted_zone = route53.HostedZone.from_hosted_zone_attributes(
-            self,
-            "HostedZone",
-            hosted_zone_id=config["hostedZoneId"],
-            zone_name=config["domainName"],
-        )
-        #        if config["awsInternal"]:
+        if config["hostedZoneId"]:
+            hosted_zone = route53.HostedZone.from_hosted_zone_attributes(
+                self,
+                "HostedZone",
+                hosted_zone_id=config["hostedZoneId"],
+                zone_name=config["domainName"],
+            )
+
         api_certificate = acm.Certificate(
             self,
             "ApiCertificate",
@@ -102,11 +104,10 @@ class StaticHighSideStack(Stack):
         # Need a domain name
         api_domain = api.add_domain_name(
             "ApiDomainName",
-            certificate=api_certificate,  # if config["awsInternal"] else None,
+            certificate=api_certificate,
             domain_name=f"{config['subdomain']}.{config['domainName']}",
             security_policy=apigateway.SecurityPolicy.TLS_1_2,
         )
-        # if config["awsInternal"]:
         route53.CnameRecord(
             self,
             "DnsCnameRecord",

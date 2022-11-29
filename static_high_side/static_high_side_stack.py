@@ -85,19 +85,20 @@ class StaticHighSideStack(Stack):
                 zone_name=config["domainName"],
             )
 
+        domain_name = config["subdomain"] + "." + config["domainName"]
         api_certificate = acm.Certificate(
             self,
             "ApiCertificate",
-            domain_name=f"{config['subdomain']}.{config['domainName']}",
+            domain_name=domain_name,
             validation=acm.CertificateValidation.from_dns(
-                hosted_zone=hosted_zone if config["hostedZoneId"] else None
+                hosted_zone=hosted_zone if hosted_zone_id else None
             ),
         )
         # Need a domain name
         api_domain = api.add_domain_name(
             "ApiDomainName",
             certificate=api_certificate,
-            domain_name=f"{config['subdomain']}.{config['domainName']}",
+            domain_name=domain_name,
             security_policy=apigateway.SecurityPolicy.TLS_1_2,
         )
         route53.CnameRecord(
@@ -114,7 +115,7 @@ class StaticHighSideStack(Stack):
                 service="s3",
                 integration_http_method="GET",
                 # All requests to raw url directed to index.html
-                path=f"{bucket.bucket_name}/index.html",
+                path=bucket.bucket_name + "/index.html",
                 options=apigateway.IntegrationOptions(
                     credentials_role=api_role,
                     integration_responses=[
@@ -150,7 +151,7 @@ class StaticHighSideStack(Stack):
             integration=apigateway.AwsIntegration(
                 service="s3",
                 integration_http_method="GET",
-                path=f"{bucket.bucket_name}/{{patha}}",
+                path=bucket.bucket_name + "{patha}",
                 options=apigateway.IntegrationOptions(
                     credentials_role=api_role,
                     request_parameters={

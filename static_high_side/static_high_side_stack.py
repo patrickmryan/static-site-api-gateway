@@ -19,7 +19,7 @@ class StaticHighSideStack(Stack):
     def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
         super().__init__(scope, construct_id, **kwargs)
 
-        sts = boto3.client("sts")
+        # sts = boto3.client("sts")
 
         # S3 bucket that will host the React application code
         bucket = s3.Bucket(
@@ -75,8 +75,6 @@ class StaticHighSideStack(Stack):
             endpoint_types=[apigateway.EndpointType.REGIONAL],
             policy=api_policy_doc,
         )
-
-        # print(str(api.root))
 
         hosted_zone_id = config.get("hostedZoneId")
         if hosted_zone_id:
